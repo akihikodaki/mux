@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<link
+			crossorigin="anonymous"
+			href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/reveal.min.css"
+			integrity="sha384-mD2KbQ9hOEgBVYcvbFF3FwvFyGugLt2EtOB3WoVLN+ssx39fyOhf3LO+lYmnnSLu"
+			rel="stylesheet">
+		<link
+			crossorigin="anonymous"
+			href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/css/theme/black.min.css"
+			integrity="sha384-O+sTORrBJgJutTaPyyg3OfUbg3UUXIq3XeLhjmZ2NYexW5mWWdjh5NRO7l9yezGF"
+				rel="stylesheet">
+		<style>
+			.highlight {
+				background: yellow;
+				color: black;
+			}
+			.reveal h1 {font-size: 2em;}
+			pre {white-space: pre-wrap;}
+		</style>
+		<title>型検証のある仮想機械のコードジェネレータ</title>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+					<h1>型検証のある仮想機械のコードジェネレータ</h1>
+					<address>Akihiko Odaki &lt;<a href="mailto:nekomanma@pixiv.com">nekomanma@pixiv.com</a>&gt;</address>
+					<p><a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="license" style="display: block"><img alt="クリエイティブ・コモンズ・ライセンス" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" style="border-width: 0" /></a>
+					この作品 (<code>index.html</code>) は
+					<a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="license"><span style="white-space: nowrap">クリエイティブ・</span><span style="white-space: nowrap">コモンズ</span>
+						表示 - 継承 4.0 国際
+<span style="white-space: nowrap">ライセンス</span></a>の下に提供されています.</p>
+					<p><span style="white-space: nowrap">表示される</span><span style="white-space: nowrap">画像</span>等はそれぞれの<span style="white-space: nowrap">ライセンス</span>に<span style="white-space: nowrap">従います</span>.</p>
+				</section>
+				<section>
+					<h1><span style="white-space: nowrap; text-transform: none">pixivで</span><span style="white-space: nowrap">アルバイト</span><span style="white-space: nowrap">やってます</span></h1>
+					<dl>
+						<dt>2017年7月から</dt>
+						<dd>Rubyで書かれたマイクロブログサービス,
+							Mastodon及びその派生であるPawooとPawoo Musicを開発.</dd>
+						<dt>2018年8月から</dt>
+						<dd>Unityで作られたVRoid StudioのUI基盤を開発.</dd>
+					</dl>
+					<p>今回はVRoid Studioのはなし.</p>
+				</section>
+				<section>
+					<h1>なんで<span style="white-space: nowrap">コードジェネレータ?</span></h1>
+				</section>
+				<section>
+					<h1>型検証のある仮想機械のコードジェネレータ</h1>
+					<p>たくさんある.</p>
+					<dl>
+						<dt>各種コンパイラフロントエンド</dt>
+						<dd>GENERICを出力するGCCフロントエンド, LLVM IRを出力するclangなど.</dd>
+						<dt>JVM, CLI</dt>
+						<dd>Javaコンパイラ, C#コンパイラなど.</dd>
+						<dt>Yacc</dt>
+						<dd>DSLからCのパーサを生成する.</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>コードジェネレータ制作の機会の増加</h1>
+					<p><s>みんなコンパイラ作りたい!</s></p>
+					<p>DSLは一般的な技法</p>
+					<dl>
+						<dt>よく定義された文法とパーサー</dt>
+						<dd>みんなRuby好き. 標準が必要であればECMAScript.</dd>
+						<dt>様々な仮想機械</dt>
+						<dd>GCC, LLVM, JVM, CLI (.NET/Mono)… CやC++も.</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>型検証のあるターゲット</h1>
+					<p><s>なぜかしらないけどみんな型をつけたがる</s></p>
+					<p>性能が要求される場面では型がついたターゲットが候補になる.</p>
+					<img alt="LLVMのロゴ" src="Dragon.svg" style="float: left" width="100" height="100"></img>
+					<p>LLVMなら強力な最適化を施した上で機械語が出力できる.</p>
+					<img alt="Monoのロゴ" src="mono-gorilla.svg" style="float: left" width="100" height="100"></img>
+					<p>Monoならインタプリタ, JIT, AOTの多様な選択肢がある.</p>
+				</section>
+				<section>
+					<h1>コンパイラ技術を<span style="white-space: nowrap">持たない</span>人間</h1>
+					<p>一方で, コンパイラ技術をもつ人間は少ない.</p>
+					<p>行き当たりばったりで開発すると死ぬ.</p>
+					<p>型はやばい.</p>
+				</section>
+				<section>
+					<h1>実例</h1>
+				</section>
+				<section>
+					<h1 style="text-transform: none">UI基盤 Mux</h1>
+					<p>VRoid Studioでは独自のUIフレームワークを開発している.</p>
+					<div style="display: flex; flex-direction: column; float: left">
+						<img alt="Unityのロゴ" src="unity-logo-white.svg" />
+						<img alt="Xamarinのロゴ" src="iTunesArtwork@2x" width="100" height="100" />
+					</div>
+					<dl>
+						<dt>UnityのUI APIを抽象化</dt>
+						<dd>Unity Editorの支援を最大限に受けられる.<br>(インスペクターやプロファイラーなど)</dd>
+						<dt>Xamarin.Formsを活用</dt>
+						<dd>成熟している. (たぶん)</dd>
+					</dl>
+				</section>
+				<section>
+					<h1 style="text-transform: none">Muxの機能とXamarin.Forms</h1>
+					<ul>
+						<li>データバインディング</li>
+						<li>データテンプレート</li>
+					</ul>
+					<p>これらをXAMLによって宣言的に記述できる.</p>
+					<p><s>実質Vue.js</s></p>
+					<p>Xamarin.Formsによって支えられている.</p>
+				</section>
+				<section>
+					<pre><code>&lt;c:ArrayList&gt;
+	&lt;n:Target P="hello" /&gt;
+	&lt;DataTemplate&gt;
+	&lt;n:Target x:DataType="n:Source" P="{Binding Q}" /&gt;
+	&lt;/DataTemplate&gt;
+&lt;/c:ArrayList&gt;</code></pre>
+					<pre><code>new ArrayList {
+	new Target { P = "hello" },
+	new DataTemplate(() => {
+	var target = new Target();
+
+	target.SetBinding(Target.PProperty, new TypedBinding&lt;Source, string&gt;(
+		source => source.Q,
+		(source, value) => source.Q = value,
+		new[] {
+		new Tuple&lt;Func&lt;TSource, object&gt;, string&gt;.Create(
+			source => source.Q, "Q") }));
+
+	return k;
+	})
+};</code></pre>
+				</section>
+				<section>
+					<h1>DSLとしてのXAML</h1>
+					<p>テンプレートやバインディングを簡潔に記述<span style="white-space: nowrap">できる</span>.</p>
+					<p>データとビューを分離したいというUI制作の要求に応える.</p>
+				</section>
+				<section>
+					<h1>実行環境</h1>
+					<img alt="Monoのロゴ" src="mono-gorilla.svg" style="float: left"></img>
+					<p>Mono</p>
+					<p><i>Common Language Infrastructure</i> (CLI)</p>
+					<ul>
+						<li>高度な型システム (<i>Common Type System</i>, CTS)</li>
+						<li>スタックマシン (<i>Virtual Execution System</i>, VES)</li>
+					</ul>
+				</section>
+				<section>
+					<h1>コンパイラ vs <span style="white-space: nowrap">インタプリタ</span></h1>
+					<p>Xamarin.FormsにはXAMLコンパイラとインタプリタが存在する.</p>
+					<p>インタプリタはC#コードを参照するために<span style="white-space: nowrap">リフレクション</span>が多発して遅い.</p>
+					<p>リフレクションはC#コードをAOTコンパイル (IL2CPP) した場合問題になる.</p>
+				</section>
+				<section>
+					<h1>静的な型の解決による<span style="white-space: nowrap">利点</span></h1>
+					<p>リフレクションを避けることでパフォーマンスが上がる.</p>
+					<p>静的に型を検証することで誤りを早く発見できる.</p>
+				</section>
+				<section>
+					<h1>静的な型の解決方法</h1>
+					<ul>
+						<li>型推論</li>
+						<li>型を記述する</li>
+					</ul>
+					<p>Xamarin.Formsでは極めて簡易ではあるがその両方を用いている.</p>
+				</section>
+				<section>
+					<h1>型推論</h1>
+					<p>一部の "Markup Extension" は入力する値の型と出力する値の方が決まっている.</p>
+					<p>例: 型を表す <code>x:Type</code></p>
+					<pre><code>{x:Type n:Target}</code></pre>
+					<dl>
+						<dt>入力</dt>
+						<dd><code>"n:Target"</code> (<code>System.String</code>)</dd>
+						<dt>出力</dt>
+						<dd><code>typeof(Namespace.Target)</code> (<code>System.Type</code>)</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>型を記述する</h1>
+					<p>データバインディング対象の型を<code>x:DataType</code><span style="white-space: nowrap">属性</span>で指定できる.</p>
+					<pre><code>&lt;n:Target x:DataType="n:Source" P="{Binding Q}" /&gt;</code></pre>
+					<pre><code>target.SetBinding(Target.PProperty, new TypedBinding&lt;Source, string&gt;(
+	<span class="highlight">source => source.Q</span>,
+	<span class="highlight">(source, value) => source.Q = value</span>,
+	new[] { new Tuple&lt;Func&lt;TSource, object&gt;, string&gt;.Create(<span class="highlight">source => source.Q</span>, "Q") }));</code></pre>
+				</section>
+				<section>
+					<h1>もし解決した型情報に<span style="white-space: nowrap">矛盾</span>があったら?</h1>
+					<p>CLIの場合, 型情報は<i>metadata</i>として出力され, VESによって検証される.</p>
+					<p>コードの信頼性を実行直前に保証できる.</p>
+					<p>これを活用してユーザーモードとカーネルモードの分離をソフトウェアで実現する<i>Singularity</i>というプロジェクトもあった.</p>
+				</section>
+				<section>
+					<h1>もし解決した型情報に<span style="white-space: nowrap">矛盾</span>があったら?</h1>
+					<p>VESはあくまで検証のみを行う.</p>
+					<p>ありがちな型変換を自動でしてくれるようなことはない.</p>
+					<p>そのまま出力するとランタイムが型検証を行った際に例外が発生する.
+					(<code>System.InvalidProgramException</code>)</p>
+				</section>
+				<section>
+					<h1>もし解決した型情報に<span style="white-space: nowrap">矛盾</span>があったら?</h1>
+					<p>Monoの場合, ランタイムの型検証が不完全だった<span style="white-space: nowrap">ため,</span>
+					「間違ってるコードは確実に実行されない」という保証もなかった.</p>
+				</section>
+				<section>
+					<h1>型システムの複雑さ</h1>
+					<p>ターゲットの型システム (CTS) に合わせなければならない.</p>
+					<p>Inheritance, generics, value type, object type, managed/unmanaged pointer type, …</p>
+					<p>つらい.</p>
+				</section>
+				<section>
+					<img alt="型の分類" class="stretch" src="cts.svg"></img>
+				</section>
+				<section>
+					<h1>「暗黙の型変換」</h1>
+					<p>DSLを自分で設計している場合, 「暗黙の型変換」はなくすことができる.</p>
+					<p>「暗黙の型変換」がなければ検証さえ確実に<span style="white-space: nowrap">行なえば</span>良い.</p>
+				</section>
+				<section>
+					<h1>「暗黙の型変換」</h1>
+					<p>実際には汎用プログラミング言語と相互運用性を確保する必要がある.</p>
+					<p>特にプログラマにとって似たような書き心地であることは重要.</p>
+					<p>つらい.</p>
+				</section>
+				<section>
+					<h1>C#で「暗黙の型変換」が発生する例</h1>
+					<dl>
+						<dt><code>System.ValueType</code>と<code>System.Object</code> (boxing/unboxing)</dt>
+						<dd>多くの場合<code>System.Object</code>が全ての基底クラスのように扱えるが, 実際は異なる.</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>C#で「暗黙の型変換」が発生する例</h1>
+					<dl>
+						<dt><code>System.ValueType</code>と<code>&System.ValueType</code> (C#の<code>ref</code>)</dt>
+						<dd>普段<code>System.ValueType</code>として扱っているものは<code>this</code>であるとき<code>&System.ValueType</code>になるので呼び出し前に変換が必要.</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>いきあたりばったりな<span style="white-space: nowrap">開発</span>は不具合をうむ</h1>
+					<p>「既存のコンパイラの出力を逆アセンブルしてまねすればいい」</p>
+					<p>しかしコンパイラの出力は指定された型に特化している.</p>
+					<p>異なる型の値を入力すると失敗する.</p>
+				</section>
+				<section>
+					<h1>いきあたりばったりな<span style="white-space: nowrap">開発</span>は不具合をうむ</h1>
+					<p>型を検証する必要がある.</p>
+					<p>変換するコードを出力する必要がある.</p>
+					<p>Xamarin.FormsのXAMLコンパイラではこれらの処理について一貫性がなく多くの不具合をはらんでいた.</p>
+				</section>
+				<section>
+					<img class="stretch" src="github.png"></img>
+				</section>
+				<section>
+					<h1>つらい!</h1>
+					<p>1つ1つ対応する必要がある.</p>
+					<p>しかし型の検証や変換は冗長な操作になる.</p>
+				</section>
+				<section>
+					<dl>
+						<dt>なにも変換してなかったり</dt>
+						<dd><img alt="GitHubのスクリーンショット" src="ldloc.png"></img></dd>
+						<dt>unboxだけしていたり</dt>
+						<dd><img alt="GitHubのスクリーンショット" src="unbox.png"></img></dd>
+						<dt>implicit castしていたり</dt>
+						<dd><img alt="GitHubのスクリーンショット" src="cast.png"></img></dd>
+					</dl>
+				</section>
+				<section>
+					<h1>重複をなくそう!</h1>
+					<p><a href="https://github.com/xamarin/Xamarin.Forms/pull/4238">[XamlC] Always enable implicit casting, boxing and unboxing by akihikodaki · Pull Request #4238 · xamarin/Xamarin.Forms</a></p>
+					<p>local variableを指定した型に変換する<code>LoadAs</code><span style="white-space: nowrap">メソッド</span>を導入.</p>
+					<pre><code>public static IEnumerable&lt;Instruction&gt; LoadAs(
+	this VariableDefinition self,
+	TypeReference type,
+	ModuleDefinition module)</code></pre>
+				</section>
+				<section>
+					<h1>重複をなくそう!</h1>
+					<p>CILはスタックマシンだからレジスタ割り付けを考える必要なしにコード生成を他のメソッドに委譲して, 受け取った命令列を挿入できる.</p>
+					<pre><code>ldloc.0 // LoadAsが出力
+box // LoadAsが出力
+call instance void Type::Method(System.Object) // LoadAsを呼び出したメソッドが出力</code></pre>
+				</section>
+				<section>
+					<p>完</p>
+				</section>
+				<section>
+					<h1>まだ終わってない!</h1>
+					<p>今度は型をいちいち指定しなければならなく<span style="white-space: nowrap">なった.</span></p>
+					<p>つらい.</p>
+				</section>
+				<section>
+					<h1>型を指定する場面を減らす</h1>
+					<p>経験則として, 型に制約が発生する場面はメソッド呼び出しであることが多い.</p>
+					<p>メソッドを呼び出すときに引数の型を見て, 自動的に変換すればよい.</p>
+					<pre><code>public static IEnumerable&lt;Instruction&gt; Call(
+	this MethodReference self,
+	param VariableDefinition[])</code></pre>
+				</section>
+				<section>
+					<h1>型を指定する場面を減らす</h1>
+					<p>さらにこれはlocal variable以外を受け付けるように拡張できる.</p>
+					<pre><code>public static IEnumerable&lt;Instruction&gt; Call(
+	this MethodReference self,
+	param object[])</code></pre>
+				</section>
+				<section>
+					<h1>メソッド呼び出しは値を生成する</h1>
+					<p>メソッド呼び出しは値を生成する. じゃあメソッド呼び出しを <code>Call</code> メソッドに渡して…</p>
+					<p>「メソッド呼び出しを渡す」?</p>
+				</section>
+				<section>
+					<h1>手続きの限界</h1>
+					<p>引数で指定された情報をもとに命令列を返すという手続きを単位とした重複の除去はもはや不可能.</p>
+					<p><code>Call</code>をメソッドではなくオブジェクトに.</p>
+					<pre><code>interface ICall
+{
+	IEnumerable Arguments;
+	MethodReference Method;
+	new ();
+	IEnumerable&lt;Instruction&gt; GenerateIL();
+}</code></pre>
+				</section>
+				<section>
+					<pre class="stretch"><code>(new Call(ImportInstanceMethodReference(
+	result: module.TypeSystem.String,
+	type: module.TypeSystem.Object,
+	name: "ToString",
+	arguments: new[] { module.TypeSytem.Object }),
+{
+	new Call(ImportInstanceMethodReference(
+	result: module.TypeSystem.Double,
+	type: module.ImportTypeReference("System", "Math"),
+	name: "Max"
+	result: module.TypeSystem.Double,
+	arguments: new[] { new ArrayType(module.TypeSystem.Double) })
+	{ new[] { 0d, 1d } }
+}).GenerateIL()</code></pre>
+				</section>
+				<section>
+					<h1>木</h1>
+					<pre><code>Call: instance System.Object System.Object::ToString()
++-Call: System.Double System.Math::Max(System.Double[])
+ +-0d
+ +-1d</code></pre>
+				</section>
+				<section>
+					<h1>型とスタックマシン</h1>
+					<p>型をつけることで値に強い依存関係が生まれる.</p>
+					<p>木をつくることで依存関係を簡潔に表せる.</p>
+					<p>スタックマシンなら簡単にコードを生成できる.</p>
+					<p>先行例: Expression Tree</p>
+				</section>
+				<section>
+					<h1>考察</h1>
+					<dl>
+					<dt>リファクタリングは辛い</dt>
+					<dd>最初の設計で型は意識すべき.</dd>
+					<dt>型をそこまで気にしなくてもいい場合もある?</dt>
+					<dd>入力の型が明確な場合 (暗黙の型変換がない), 扱う型が少ない場合.</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>考察</h1>
+					<dl>
+						<dt>スタックマシンじゃなかったら?</dt>
+						<dd>仮想機械ならレジスタマシンでも無限のレジスタを用意していたり,
+							SSA (変数への代入が1回に制限) だったりするので,
+							一時変数を大量に作ればレジスタの割り当てなどは問題にならない.</dd>
+					</dl>
+				</section>
+				<section>
+					<h1>参照</h1>
+					<ul>
+						<li><a href="https://pawoo.net/">Pawoo</a></li>
+						<li><a href="https://music.pawoo.net/">Pawoo Music</a></li>
+						<li><a href="https://studio.vroid.com/">VRoid Studio</a></li>
+						<li><a href="https://gcc.gnu.org/onlinedocs/gccint/GENERIC.html">GNU Compiler Collection (GCC) Internals: GENERIC</a></li>
+						<li><a href="https://llvm.org/">The LLVM Compiler Infrastructure Project</a></li>
+						<li><a href="https://www.ecma-international.org/publications/standards/Ecma-335.htm">Standard ECMA-335</a></li>
+						<li><a href="https://docs.oracle.com/javase/specs/jvms/se7/html/index.html">The Java® Virtual Machine Specification</a></li>
+					</ul>
+				</section>
+				<section>
+					<h1>参照</h1>
+					<ul>
+						<li><a href="https://docs.microsoft.com/openspecs/microsoft_domain_specific_languages/ms-xaml-2017/6e54cd2e-4421-4c06-ae3a-15d2762c8899">[MS-XAML-2017]: XAML Object Mapping Specification | Microsoft Docs</a></li>
+						<li><a href="https://docs.microsoft.com/xamarin/xamarin-forms/">Xamarin.Forms - Xamarin | Microsoft Docs</a></li>
+						<li><a href="https://docs.unity3d.com/Manual/IL2CPP.html">Unity - Manual: IL2CPP</a></li>
+						<li><a href="https://www.microsoft.com/en-us/research/project/singularity/">Singularity - Microsoft Research</a></li>
+						<li><a href="https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/expression-trees/">Expression Trees (C#) | Microsoft Docs</a></li>
+					</ul>
+				</section>
+				<section>
+					<h1>ライセンス</h1>
+					<dl>
+						<dt><code>Dragon.svg</code></dt>
+						<dd><a href="https://llvm.org/Logo.html">Apple Inc.によりライセンスされています.</a></dd>
+						<dt><code>cts.svg</code></dt>
+						<dd><a href="https://www.ecma-international.org/publications/standards/Ecma-335.htm">Ecma Internationalによりライセンスされています.</a></dd>
+						<dt><code>iTunesArtwork@2x</code></dt>
+						<dd><a href="https://github.com/xamarin/xamarin-forms-samples/blob/master/LICENSE">Xamarin Incによりライセンスされています.</a></dd>
+					</dl>
+				</section>
+				<section>
+					<h1>ライセンス</h1>
+					<dl>
+						<dt><code>mono-gorilla.svg</code></dt>
+						<dd><a href="https://www.mono-project.com/docs/about-mono/legal/">Creative Commons Attribution-Share Alike 3.0 United States Licenseでライセンスされています.</a></dd>
+						<dt><code>unity-logo-white.svg</code></dt>
+						<dd><a href="https://unity3d.com/legal/branding_trademarks">Unity Technologiesによりライセンスされています.</a></dd>
+					</dl>
+				</section>
+			</div class="slides">
+		</div>
+		<script
+			crossorigin="anonymous"
+			integrity="sha384-YSZJq04Xw1k1QeTgkujYtdAjgN/sspQx01Qx4JPksOst7V7juBOa/XBwsIK+mJ7c"
+			src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.7.0/js/reveal.min.js">
+		</script>
+		<script>Reveal.initialize();</script>
+	</body>
+</html>
